@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Resources:
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-function
+      Code:
+        ZipFile: |
+          def handle_event(event, context):
+              print('Hello World! (' +  event['detail-type'] + ')')
+      Handler: index.handle_event
+      Role: !GetAtt LambdaRole.Arn
+      Runtime: python3.7
+      MemorySize: 256
+      Timeout: 60
+
+  EventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: EventRule
+      EventPattern:
+        source:
+          - helloworld
+      ScheduleExpression: rate(2 minutes)
+      State: ENABLED
+      Targets:
+        -
+          Arn: !GetAtt LambdaFunction.Arn
+          Id: TargetFunctionV1
+
+  PermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventRule.Arn
